@@ -3,6 +3,7 @@
 import dlib                     #人脸识别的库dlib
 import numpy as np              #数据处理的库numpy
 import cv2                      #图像处理的库OpenCv
+import math
 
 
 class face_emotion():
@@ -10,15 +11,13 @@ class face_emotion():
     def __init__(self):
         # 使用特征提取器get_frontal_face_detector
         self.detector = dlib.get_frontal_face_detector()
-        # dlib的68点模型，使用作者训练好的特征预测器
+        # dlib的68点模型，使用训练好的特征预测器
         self.predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 
         #建cv2摄像头对象，这里使用电脑自带摄像头，如果接了外部摄像头，则自动切换到外部摄像头
         self.cap = cv2.VideoCapture(0)
         # 设置视频参数，propId设置的视频参数，value设置的参数值
         self.cap.set(3, 480)
-        # 截图screenshoot的计数器
-        self.cnt = 0
 
 
     def learning_face(self):
@@ -26,6 +25,10 @@ class face_emotion():
         # 眉毛直线拟合数据缓冲
         line_brow_x = []
         line_brow_y = []
+
+        emotion_set =[]
+        res=''
+        times=0
 
         # cap.isOpened（） 返回true/false 检查初始化是否成功
         while(self.cap.isOpened()):
@@ -65,8 +68,8 @@ class face_emotion():
                         # 圆圈显示每个特征点
                         for i in range(68):
                             cv2.circle(im_rd, (shape.part(i).x, shape.part(i).y), 2, (0, 255, 0), -1, 8)
-                            #cv2.putText(im_rd, str(i), (shape.part(i).x, shape.part(i).y), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                            #            (255, 255, 255))
+                         # cv2.putText(im_rd, str(i), (shape.part(i).x, shape.part(i).y), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                                       # (255, 255, 255))
 
                         # 分析任意n点的位置关系来作为表情识别的依据
                         mouth_width = (shape.part(54).x - shape.part(48).x) / self.face_width  # 嘴巴咧开程度
@@ -103,30 +106,46 @@ class face_emotion():
                         # 分情况讨论
                         # 张嘴，可能是开心或者惊讶
                         if round(mouth_higth >= 0.03):
-                            if eye_hight >= 0.056:
+                            if eye_hight >= 0.046:
                                 cv2.putText(im_rd, "amazing", (d.left(), d.bottom() + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                                             (0, 0, 255), 2, 4)
+                                emotion_set.append(0)
                             else:
                                 cv2.putText(im_rd, "happy", (d.left(), d.bottom() + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                                             (0, 0, 255), 2, 4)
+                                emotion_set.append(1)
 
                         # 没有张嘴，可能是正常和生气
                         else:
-                            if self.brow_k <= -0.3:
+                            if self.brow_k <= -0.25:
                                 cv2.putText(im_rd, "angry", (d.left(), d.bottom() + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                                             (0, 0, 255), 2, 4)
+                                emotion_set.append(2)
                             else:
                                 cv2.putText(im_rd, "nature", (d.left(), d.bottom() + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                                             (0, 0, 255), 2, 4)
+                                emotion_set.append(3)
+                        if len(emotion_set)== 100:
+                            times=0
+                            for i in range(1,100):
+                                if(emotion_set[i]!= emotion_set[i-1]):
+                                    times+=1
+                            res = 1/(1+math.e**(-0.1*times+4))*100
+                            round(res,2)
+                            res = str(res)+"%"
+                            emotion_set =[]
+
 
                 # 标出人脸数
-                cv2.putText(im_rd, "Faces: "+str(len(faces)), (20,50), font, 1, (0, 0, 255), 1, cv2.LINE_AA)
-            else:
+               # cv2.putText(im_rd, "Faces: "+str(len(faces)), (20,50), font, 1, (0, 0, 255), 1, cv2.LINE_AA)
+           # else:
                 # 没有检测到人脸
-                cv2.putText(im_rd, "No Face", (20, 50), font, 1, (0, 0, 255), 1, cv2.LINE_AA)
+                # cv2.putText(im_rd, "No Face", (20, 50), font, 1, (0, 0, 255), 1, cv2.LINE_AA)
 
+            cv2.putText(im_rd, "Lied Probability:" + str(res), (20, 50), font, 1, (0, 0, 0), 1,
+                                        cv2.LINE_AA)
             # 添加说明
-            im_rd = cv2.putText(im_rd, "Q: quit", (20, 450), font, 0.8, (0, 0, 255), 1, cv2.LINE_AA)
+            # im_rd = cv2.putText(im_rd, "Q: quit", (20, 450), font, 0.8, (0, 0, 255), 1, cv2.LINE_AA)
 
             # 按下q键退出
             if(k == ord('q')):
